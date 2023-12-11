@@ -5,6 +5,7 @@ import copy
 import random
 import math
 import threading
+from concurrent.futures import ProcessPoolExecutor
 CTR_random = "a3fa6d97f4807e145b37451fc344e58c"
 
 AES_modulus = BitVector(bitstring='100011011')
@@ -261,16 +262,14 @@ def decryptMsg(msg,ekeys,nro) :
 
 def encryptBlockCTR(block , ekeys , totalRound , counter,thrd,lock,encrypt) :
     #CTR
-    lock.acquire()
+    # lock.acquire()
     global x
     global rcver
-    #print(counter)
     counter = int(counter,16) + thrd
-    #print(type(counter),type(i))
     counter = hex(counter)
     counter = counter[2:]
     counter = hexToArray(counter)
-    # print(counter)
+    # print(block)
     cipher = xorAdd(byteToMatrix(counter),ekeys[0]) 
     for i in range(1, totalRound+1) :
         cipher = (shiftLeft(subBytes(cipher)))
@@ -284,8 +283,9 @@ def encryptBlockCTR(block , ekeys , totalRound , counter,thrd,lock,encrypt) :
     else :
         rcver[thrd] = cipher 
     # print(cipher)
-    # print(x[thrd])
-    lock.release() 
+    print(thrd)
+    # lock.release() 
+    return cipher
 
 
 def getKey(key,type) :
@@ -345,27 +345,34 @@ def AES_send(type,msg,isFile,ekeys,mode):
             CTR_random+='0'
         global x 
         no_threads = math.ceil(len(msgHex)/(type/8))  
+        executor = ProcessPoolExecutor(no_threads)
         # print("Threads : ",no_threads)
         x = ["00"]*no_threads
-        lock = threading.Lock() 
+        # lock = threading.Lock() 
+        lock = 0
         sz = len(ekeys[0][0]) * 4
         j = 0 
-        tt = [0]*(no_threads)
+        # tt = [0]*(no_threads)
+        # print("Here")
+        futures1 = []
         for i in range(no_threads) :
-            tt[i] = threading.Thread(target=encryptBlockCTR,args =(msgHex[j:j+sz],ekeys,nro,CTR_random,i,lock,1)) 
+            future = executor.submit(encryptBlockCTR,msgHex[j:j+sz],ekeys,nro,CTR_random,i,lock,1)
+            # print("HERE")
+            futures1.append(future.result()) 
+            # print(future.result())
             j+=sz
     
-        # start threads 
-        for i in range(no_threads) :
-            tt[i].start()
+        # # start threads 
+        # for i in range(no_threads) :
+        #     tt[i].start()
     
-        # wait until threads finish their job 
-        for i in range(no_threads) :
-            tt[i].join()
+        # # wait until threads finish their job 
+        # for i in range(no_threads) :
+        #     tt[i].join()
         # print("X is : " ,x)
         cipherHex = []
-        for i in range(len(x)) :
-            cipherHex.extend(x[i])
+        for i in range(no_threads) :
+            cipherHex.extend(futures1[i])
     else :
         cipherHex = encryptMsg(msgHex,ekeys,nro)
     cipherAscii = hexToString(cipherHex)
@@ -384,26 +391,24 @@ def AES_recv(type,msg,isFile,key,mode) :
         global rcver
         global CTR_random 
         no_threads = math.ceil(len(msg)/(type/8))  
+        executor1 = ProcessPoolExecutor(no_threads)
         rcver = ["00"]*no_threads
-        lock2 = threading.Lock()
+        # lock2 = threading.Lock()
+        lock2 = 0 
         sz = len(key[0][0]) * 4
         j = 0 
-        t = [0]*(no_threads)
+        # t = [0]*(no_threads)
+        futures = []
         for i in range(no_threads) :
-            t[i] = threading.Thread(target=encryptBlockCTR,args =(msg[j:j+sz],key,nro,CTR_random,i,lock2,0)) 
+            # print("here")
+            future = executor1.submit(encryptBlockCTR,msg[j:j+sz],key,nro,CTR_random,i,lock2,0)
+            futures.append(future.result())
+            # print(future.result())
             j+=sz
-    
-        # start threads 
-        for i in range(no_threads) :
-            t[i].start()
-    
-        # wait until threads finish their job 
-        for i in range(no_threads) :
-            t[i].join()
-        # print("X is : " ,x)
+
         decipheredMsg = []
-        for i in range(len(rcver)) :
-            decipheredMsg.extend(rcver[i])
+        for i in range(no_threads) :
+            decipheredMsg.extend(futures[i])
         # print("Deciphering in CTR mode")
 
     else :
@@ -446,7 +451,7 @@ if __name__ == "__main__":
 
 
     start = time.time()
-    ekeys,hexKey = getKey(key,256)
+    ekeys,hexKey = getKey(key,128)
     print("\nKey(In hex): ",end = " ")
     for i in range(len(hexKey)):
         print(hexKey[i],end = " ")
@@ -455,7 +460,7 @@ if __name__ == "__main__":
     
     # Send=========================================>
     start = time.time()
-    [ekeys,cipher]   = AES_send(256,msg,isFile,ekeys,mode)
+    [ekeys,cipher]   = AES_send(128,msg,isFile,ekeys,mode)
     print("\nCipherText(in hex) : ",end = " ")
     for i in range(len(cipher)):
         print(cipher[i],end = " ")
@@ -468,7 +473,7 @@ if __name__ == "__main__":
     
     # recive ======================================>
     startTime = time.time()
-    plaintxt = AES_recv(256,cipher,isFile,ekeys,mode)
+    plaintxt = AES_recv(128,cipher,isFile,ekeys,mode)
     print("\n\nDeciphered text/file contents (in hex) :", end = " ") 
     for i in range(len(plaintxt)):
         print(plaintxt[i],end = " ")
