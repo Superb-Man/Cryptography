@@ -1,2 +1,3 @@
-# Computer-Security
-OMG!!So this is Computer Security
+# RSA and Diffie Hellman Eliptic Curve Cryptography
+# AES-128,192,256
+
