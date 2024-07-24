@@ -70,6 +70,8 @@ def double_and_add(Px,Py,privateKey,p,a,b) :
     
     return Tx,Ty
 
+
+
 if __name__ == "__main__":
 
     bits = [128,192,256]

@@ -157,8 +157,6 @@ def shiftRight(mat) :
 
 
 def mul(mat1,mat2) :
-    # preCalc()
-    # [[sum(val1*val2 for val1,val2 in zip(r,c)) for c in zip(*mat2)] for r in mat1]
     return [[xorAddlist([mulTable[val1.intValue()][val2.intValue()] for val1, val2 in zip(r, c)]) \
         for c in zip(*mat2)] for r in mat1]
 
@@ -196,7 +194,7 @@ def schedule(key) :
         # transposing a matrix
         curKey = [list(rr) for rr in zip(*curKey)] 
         keys.append(curKey)
-        # print("Curkey : ", [e.get_bitvector_in_hex() for col in zip(*curKey) for e in col] )
+
         round_constant = btwo.gf_multiply_modular(round_constant,AES_modulus,8)
     
     return keys
@@ -204,12 +202,6 @@ def schedule(key) :
 
 def encryptBlock(block , ekeys , totalRound , ivector) :
     #CBC
-    # l = len(block)
-    # print(l)
-    # for i in range(l) :
-    #     block[i] = str(BitVector(hexstring = block[i]) ^ BitVector(hexstring = ivector[i])).encode().hex()
-    #     print(block[i])
-    # print(ivector,end="\n\n")
     cipher = xorAdd(byteToMatrix(ivector),byteToMatrix(block))
     cipher = xorAdd(cipher,ekeys[0]) 
     for i in range(1, totalRound+1) :
@@ -218,7 +210,6 @@ def encryptBlock(block , ekeys , totalRound , ivector) :
             cipher = mul(Mixer,cipher)
         cipher = xorAdd(cipher,ekeys[i])
     ivector = [e.get_bitvector_in_hex() for col in zip(*cipher) for e in col] 
-    #print(ivector)
     return ivector
 
 def encryptMsg(msg,ekeys,nro) :
@@ -226,7 +217,6 @@ def encryptMsg(msg,ekeys,nro) :
     size = len(ekeys[0][0]) * 4
     ivector = ["00"] * size
     for i in range(0,len(msg),size) :
-        #print(ivector)
         ivector = encryptBlock(msg[i:i+size],ekeys,nro,ivector)
         res.extend(ivector)
 
@@ -236,7 +226,6 @@ def encryptMsg(msg,ekeys,nro) :
 
 def decryptBlock(block , ekeys , totalRound , ivector) :
     #CBC
-    #cipher = xorAdd(byteToMatrix(block),ivector)
     plaintxt = xorAdd(byteToMatrix(block),ekeys[0]) 
     for i in range(1, totalRound+1) :
         plaintxt = (shiftRight(invSubBytes(plaintxt)))
@@ -262,29 +251,26 @@ def decryptMsg(msg,ekeys,nro) :
 
 def encryptBlockCTR(block , ekeys , totalRound , counter,thrd,lock,encrypt) :
     #CTR
-    # lock.acquire()
     global x
     global rcver
     counter = int(counter,16) + thrd
     counter = hex(counter)
     counter = counter[2:]
     counter = hexToArray(counter)
-    # print(block)
     cipher = xorAdd(byteToMatrix(counter),ekeys[0]) 
     for i in range(1, totalRound+1) :
         cipher = (shiftLeft(subBytes(cipher)))
         if(i < totalRound) :
             cipher = mul(Mixer,cipher)
         cipher = xorAdd(cipher,ekeys[i])
+
     cipher = xorAdd(cipher,byteToMatrix(block))
     cipher = [e.get_bitvector_in_hex() for col in zip(*cipher) for e in col]
     if int(encrypt) == 1 :
         x[thrd] = cipher
     else :
         rcver[thrd] = cipher 
-    # print(cipher)
-    print(thrd)
-    # lock.release() 
+
     return cipher
 
 
@@ -304,7 +290,7 @@ def getKey(key,type) :
 
 def AES_send(type,msg,isFile,ekeys,mode):
     preCalc()
-    print("\n\n\nAES - "+str(type)+":\n")
+    # print("\n\n\nAES - "+str(type)+":\n")
 
     msgHex = stringToHex(msg)
 
@@ -326,16 +312,16 @@ def AES_send(type,msg,isFile,ekeys,mode):
             #print('laraloveslinux')
 
     mod  = 16 - (l1+xtra)%16
-    # print(mod)
+
     while((l1+xtra) %16 != 0) :
         msgHex.append(paddingmap[mod])
         xtra+=1
 
-    print("\nPlain text/File(In hex) : ",end = " ")
-    for i in range(l1+xtra):
-        print(msgHex[i]+" ",end = " ")
-    print("\n")
-    # print(mode)
+    # print("\nPlain text/File(In hex) : ",end = " ")
+    # for i in range(l1+xtra):
+    #     print(msgHex[i]+" ",end = " ")
+    # print("\n")
+
     if int(mode) == 2 :
         global CTR_random
         CTR_random = random.getrandbits(int(type))
@@ -346,37 +332,24 @@ def AES_send(type,msg,isFile,ekeys,mode):
         global x 
         no_threads = math.ceil(len(msgHex)/(type/8))  
         executor = ProcessPoolExecutor(no_threads)
-        # print("Threads : ",no_threads)
+
         x = ["00"]*no_threads
-        # lock = threading.Lock() 
+
         lock = 0
         sz = len(ekeys[0][0]) * 4
         j = 0 
-        # tt = [0]*(no_threads)
-        # print("Here")
         futures1 = []
         for i in range(no_threads) :
             future = executor.submit(encryptBlockCTR,msgHex[j:j+sz],ekeys,nro,CTR_random,i,lock,1)
-            # print("HERE")
             futures1.append(future.result()) 
-            # print(future.result())
             j+=sz
     
-        # # start threads 
-        # for i in range(no_threads) :
-        #     tt[i].start()
-    
-        # # wait until threads finish their job 
-        # for i in range(no_threads) :
-        #     tt[i].join()
-        # print("X is : " ,x)
         cipherHex = []
         for i in range(no_threads) :
             cipherHex.extend(futures1[i])
     else :
         cipherHex = encryptMsg(msgHex,ekeys,nro)
     cipherAscii = hexToString(cipherHex)
-    # print("CipherText in ASCII : "+cipherAscii)
 
 
     return ekeys,cipherHex
@@ -385,7 +358,6 @@ def AES_recv(type,msg,isFile,key,mode) :
     preCalc()
     size = int(type/8)
     nro  = roundArrayMap[type]
-    # print(msg)
 
     if int(mode) == 2 :
         global rcver
@@ -393,44 +365,42 @@ def AES_recv(type,msg,isFile,key,mode) :
         no_threads = math.ceil(len(msg)/(type/8))  
         executor1 = ProcessPoolExecutor(no_threads)
         rcver = ["00"]*no_threads
-        # lock2 = threading.Lock()
+
         lock2 = 0 
         sz = len(key[0][0]) * 4
         j = 0 
-        # t = [0]*(no_threads)
+
         futures = []
         for i in range(no_threads) :
-            # print("here")
+
             future = executor1.submit(encryptBlockCTR,msg[j:j+sz],key,nro,CTR_random,i,lock2,0)
             futures.append(future.result())
-            # print(future.result())
+
             j+=sz
 
         decipheredMsg = []
         for i in range(no_threads) :
             decipheredMsg.extend(futures[i])
-        # print("Deciphering in CTR mode")
 
     else :
         decipheredMsg = decryptMsg(msg, key, nro)
+
     lol = copy.copy(decipheredMsg) 
     popp = 0 
     cnt = 0
     laastt =""
     while cnt != 16:
         y = lol.pop()
-        # print(y)
+
         if y == "00" :
             popp+=1
         if cnt == 0 :
             laastt+= y 
-            # print(laastt)
         cnt+=1
     if popp == 16 :
         decipheredMsg = lol
     else :
         z = invPaddingMap[laastt]
-        # print(z)
         while z > 0 :
             decipheredMsg.pop()
             z-=1
@@ -452,21 +422,20 @@ if __name__ == "__main__":
 
     start = time.time()
     ekeys,hexKey = getKey(key,128)
-    print("\nKey(In hex): ",end = " ")
-    for i in range(len(hexKey)):
-        print(hexKey[i],end = " ")
-    print("\n")
+    # print("\nKey(In hex): ",end = " ")
+    # for i in range(len(hexKey)):
+    #     print(hexKey[i],end = " ")
+    # print("\n")
     schedTime = time.time() - start
     
     # Send=========================================>
     start = time.time()
     [ekeys,cipher]   = AES_send(128,msg,isFile,ekeys,mode)
-    print("\nCipherText(in hex) : ",end = " ")
-    for i in range(len(cipher)):
-        print(cipher[i],end = " ")
-    print("\n")
+    # print("\nCipherText(in hex) : ",end = " ")
+    # for i in range(len(cipher)):
+    #     print(cipher[i],end = " ")
+    # print("\n")
     encryptionTime = time.time() - start
-    # print(ekeys[0][0])
 
     
     
@@ -474,10 +443,10 @@ if __name__ == "__main__":
     # recive ======================================>
     startTime = time.time()
     plaintxt = AES_recv(128,cipher,isFile,ekeys,mode)
-    print("\n\nDeciphered text/file contents (in hex) :", end = " ") 
-    for i in range(len(plaintxt)):
-        print(plaintxt[i],end = " ")
-    print("\n") 
+    # print("\n\nDeciphered text/file contents (in hex) :", end = " ") 
+    # for i in range(len(plaintxt)):
+    #     print(plaintxt[i],end = " ")
+    # print("\n") 
     if isFile :
         with open("decrypted_", 'wb') as f:
             f.write(binascii.unhexlify("".join(plaintxt)))

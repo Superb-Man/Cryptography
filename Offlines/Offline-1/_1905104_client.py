@@ -27,7 +27,7 @@ if __name__ == "__main__":
     print("Shared Secret Key : ",shared_kb[0],end = "\n\n")
 
     key = getKey(str(shared_kb[0]),128)
-    msg = s.recv(4096).decode()
+    msg = s.recv(1024*100).decode()
     msg = msg.split(",")
     cipher = []
     x = copy.copy(msg[0])

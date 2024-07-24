@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
         client[0].send(msg.encode())
 
-        msg =  client[0].recv(1024).decode()
+        msg =  client[0].recv(1024*100).decode()
         msg = msg.split(",") 
         pu_kb = [int(msg[i]) for i in range(len(msg))]
         shared_ka = double_and_add(pu_kb[0],pu_kb[1],pr_ka,p,a,b)
@@ -55,6 +55,6 @@ if __name__ == "__main__":
         # print(msg)
         client[0].send((msg+","+str(isFile)).encode())
 
-        client[0].close() 
+        # client[0].close() 
 
         # break
