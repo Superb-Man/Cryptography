@@ -299,23 +299,13 @@ def AES_send(type,msg,isFile,ekeys,mode):
             msgHex = hexToArray(f.read().hex())
     l1 = len(msgHex)
 
-    size = int(type/8)
+    if len(msgHex) % 16 == 0:
+        msgHex.append("00")
+    msgHex.extend([paddingmap[16 - len(msgHex) % 16]] * (16 - len(msgHex) % 16))
+
+    # print('LARA AMI TOMAKE VALOBASHI',msgHex)
     nro  = roundArrayMap[type]
 
-    xtra = 0 
-    if((l1+xtra) %16 == 0) :
-        msgHex.append("00")
-        xtra+=1
-        while((l1+xtra) %16 != 0) :
-            msgHex.append("00")
-            xtra+=1
-            #print('laraloveslinux')
-
-    mod  = 16 - (l1+xtra)%16
-
-    while((l1+xtra) %16 != 0) :
-        msgHex.append(paddingmap[mod])
-        xtra+=1
 
     # print("\nPlain text/File(In hex) : ",end = " ")
     # for i in range(l1+xtra):
@@ -385,25 +375,13 @@ def AES_recv(type,msg,isFile,key,mode) :
     else :
         decipheredMsg = decryptMsg(msg, key, nro)
 
-    lol = copy.copy(decipheredMsg) 
-    popp = 0 
-    cnt = 0
-    laastt =""
-    while cnt != 16:
-        y = lol.pop()
+    popp = sum(1 for i in range(16) if decipheredMsg[-(i+1)] == "00")
+    laastt = decipheredMsg[-16] if popp == 16 else decipheredMsg[-1]
 
-        if y == "00" :
-            popp+=1
-        if cnt == 0 :
-            laastt+= y 
-        cnt+=1
-    if popp == 16 :
-        decipheredMsg = lol
-    else :
-        z = invPaddingMap[laastt]
-        while z > 0 :
-            decipheredMsg.pop()
-            z-=1
+    if popp == 16:
+        decipheredMsg = decipheredMsg[:-16]
+    else:
+        decipheredMsg = decipheredMsg[:-invPaddingMap[laastt]]
     
     return decipheredMsg
     
